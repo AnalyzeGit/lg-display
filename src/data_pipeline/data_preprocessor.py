@@ -30,7 +30,7 @@ class DataPreprocessor:
     
     def _set_subinventory_priority_order(self):
         # 우선순위 (원하는 순서로 정렬되게끔)
-        priority = ['RMA', 'TANA']
+        priority = ['RMA', 'REP', 'TANA']
         # 우선순위 매핑 딕셔너리 생성
         priority_map = {val: i for i, val in enumerate(priority)}
 
@@ -200,7 +200,7 @@ class DataPreprocessor:
         return self
 
     def _finalize(self) -> "DataPreprocessor":
-        self.df = self.df.sort_values(by=['CaseID','CREATION_DATE'])
+        # self.df = self.df.sort_values(by=['CaseID','CREATION_DATE'])
         self.df = self.df.reset_index(drop=True)
         return self
 
@@ -209,7 +209,6 @@ class DataPreprocessor:
             self
             ._derive_case_id()
             ._simplify_subinventory_label()
-            ._set_subinventory_priority_order()
             ._map_category()
             ._sort_by_case_and_time()
             ._select_cols()
@@ -217,6 +216,7 @@ class DataPreprocessor:
             ._remove_conditional_duplicates_with_prev()
             ._remove_time_near_containerpack_duplicates()
             ._remove_time_based_conditional_duplicates()
+            ._set_subinventory_priority_order()
             ._finalize()
         )
 
