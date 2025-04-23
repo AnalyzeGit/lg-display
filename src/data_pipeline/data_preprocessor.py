@@ -42,7 +42,7 @@ class DataPreprocessor:
 
         # 필요 시 정렬용 컬럼 제거
         self.df = self.df.drop(columns='SUBINVENTORY_ORDER')
-
+                    
         return self
 
     def _sort_by_case_and_time(self) -> "DataPreprocessor":
@@ -198,9 +198,48 @@ class DataPreprocessor:
         self.df = df.drop(index=dup_idx).drop(columns=["dup_key", "prev_time", "time_diff"]).reset_index(drop=True)
 
         return self
+    
+    @staticmethod
+    def _classify_case(activity_seq):
+        if "SVC Scrap Completion" in activity_seq or "SVC Scrap Issue" in activity_seq:
+            return "수리 후 폐기"
+
+        elif "WIP Completion" in activity_seq and "Sales order issue" in activity_seq:
+            return "수리 후 재출하"
+
+        elif "SVC B/S Non Commercial Value Supply" in activity_seq:
+            return "무상 공급"
+
+        elif (
+            "SVC Normal RMA Receipt" in activity_seq and
+            "Subinventory Transfer" in activity_seq and
+            "SVC Analysis Transfer" in activity_seq
+        ):
+            return "반환 후 분석 이관"
+
+        elif (
+            "SVC Normal RMA Receipt" in activity_seq and
+            "Subinventory Transfer" in activity_seq and
+            "Sales Order Pick" in activity_seq and
+            "Sales Order Issue" in activity_seq and
+            "Container Pack" not in activity_seq
+        ):
+            return "포장 없이 출하"
+
+        elif activity_seq.count("SVC Analysis Return") >= 1 or activity_seq.count("SVC Analysis Issue") >= 2:
+            return "복합 분석 이관"
+
+        else:
+            return "기타"
+    
+    def _apply_classification_case(self) -> "DataPreprocessor":
+        activity_sequence = self.df.groupby("CaseID")["TXN_TYPE"].apply(list)
+        case_labels = activity_sequence.apply(DataPreprocessor._classify_case)
+        self.df = self.df.merge(case_labels.rename("CASE_TYPE"), left_on="CaseID", right_index=True)
+        return self
+
 
     def _finalize(self) -> "DataPreprocessor":
-        # self.df = self.df.sort_values(by=['CaseID','CREATION_DATE'])
         self.df = self.df.reset_index(drop=True)
         return self
 
@@ -217,6 +256,7 @@ class DataPreprocessor:
             ._remove_time_near_containerpack_duplicates()
             ._remove_time_based_conditional_duplicates()
             ._set_subinventory_priority_order()
+            ._apply_classification_case()
             ._finalize()
         )
 
